@@ -259,5 +259,96 @@ $$
 P_k = (I - K_kH_k)P^-_k
 $$
 
+# Stage1：用加速度计修正roll/pitch
 
+用当前的“先验姿态四元数”去预测重力方向（期望测量），再用加速度计实测减掉期望测量得到残差；残差乘 Kalman 增益得到一个“小的修正四元数增量” $q_{e1}$；为了不让加速度计把 yaw 搅乱，把$q_{e1}$的 yaw 对应分量置零。
+
+## Step0：准备输入
+
+* 先验姿态四元数（用陀螺积分得到）
+$$
+\hat{q}_k^- = \begin{bmatrix}q_0,q_1,q_2,q_3\end{bmatrix}^T
+$$
+
+* 加速度计测量:
+$$
+z_{k1} = \begin{bmatrix}a_x, a_y, a_z\end{bmatrix}^T
+$$
+
+关键点：加速度计测的是$g + a_{lin}$。为了把它当“重力方向”用，要归一化（并在动态大时降权/弃用）：
+
+$$
+\~{z} = \frac{z_{k1}}{\|z_{k1}\|}
+$$
+
+
+## Step1: 用四元数预测“期望重力方向”$h_1(\^q)$
+
+“把导航系重力$\begin{bmatrix}0,0,1\end{bmatrix}$”旋到 body 系后的方向（单位向量形式）：
+$$
+h_1(\^q) = \begin{bmatrix}2q_1q_3 - 2q_0q_2 \\ 2q_0q_1 + 2q_2q_3 \\ q_0^2 - q_1^2 -q_2^2 + q_3^2\end{bmatrix}
+$$
+它输出是 3×1，和归一化后的加速度计方向同维度。
+
+![alt text](image-14.png)
+
+## Step2: 算残差
+
+$$
+r = \~z - h_1(\hat{q}_k^-)
+$$
+
+这个式子代表：**测到的重力方向减去姿态预测的重力方向**
+
+## Step3：算雅可比$H_{k1} = \frac{\partial{h_1}}{\partial{q}}\quad(3 \times 4)$
+
+对上面的$h_1$分量逐项求导，得到：
+
+第一行$h_x = 2q_1q_3 - 2q_0q_2$
+
+$$
+\frac{\partial{h_x}}{\partial\begin{bmatrix}q_0,q_1,q_2,q_3\end{bmatrix}} = \begin{bmatrix}-2q_2, 2q_3, -2q_0, 2q_1\end{bmatrix}
+$$
+
+![alt text](image-15.png)
+
+## Step4: 算创新协方差S和卡尔曼增益K
+
+$$
+S = H_{k1}P_k^-H_{k1}^T + R_{k1}
+K = P_k^-H_{k1}^TS^{-1}
+$$
+
+* $P_k^-$: 四元数状态协方差
+* $R_{k1}$: 加速度计观测噪声协方差，**动态越大应设越大**，降低加速度校正力度
+
+## Step5: 更新四元数并归一化
+标准KF更新：
+$$
+\^q_k = \^q_k^- + Kr
+$$
+
+### 先算四元数增量
+$$
+q_{e1} = Kr
+$$
+
+### 隔离yaw
+$$
+(q_{e1})_3 \leftarrow 0
+$$
+
+### 更新四元数
+$$
+\hat{q}_k = \hat{q}_k^- + q_{e1}
+$$
+
+归一化：
+$$
+\^q_k \leftarrow \frac{\^q_k}{\|\^q_k\|}
+$$
+协方差更新：
+$$
+P_k = (I - KH_{k1})P^-_k
+$$
 
