@@ -352,3 +352,38 @@ $$
 P_k = (I - KH_{k1})P^-_k
 $$
 
+# Stage2: 用磁力计修正yaw
+
+## Step0: 输入(Stage1更新后的结果)
+
+![alt text](image-18.png)
+
+## Step1: 期望磁场（由先验四元数预测）
+
+![alt text](image-19.png)
+
+## Step2：残差
+
+![alt text](image-20.png)
+
+## Step3：测量雅可比$H_{k2}$
+
+![alt text](image-21.png)
+
+这里的$q_i$用的当前用于Stage2的先验$\^q_k^{(1)}$里的分量。
+
+## Step4：创新协方差与卡尔曼增益
+
+![alt text](image-22.png)
+
+## Step5：算修正量，并隔离roll/pitch,只保留yaw
+
+![alt text](image-23.png)
+
+然后做隔离：把 roll/pitch 对应的分量置零，只保留 yaw 对应那一维。
+
+## Step6：更新四元数、归一化、更新协方差
+
+![alt text](image-24.png)
+
+
